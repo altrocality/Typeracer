@@ -8,6 +8,15 @@
 // @match        https://staging.typeracer.com/*
 // @icon         https://www.google.com/s2/favicons?domain=typeracer.com
 // ==/UserScript==
+/*
+/////////////////////////////////////////////////////////////////////////////
+To change the settings, press 'change display format' when in a race.
+
+If you're using poem's smooth caret, access the menu by:
+    1. Selecting the input box
+    2. Press shift + tab, then enter
+/////////////////////////////////////////////////////////////////////////////
+*/
 var peek;
 var enabled;
 
@@ -22,7 +31,7 @@ function loadSettings() {
     peek = parseInt(localStorage.getItem("peek"));
     if (Number.isNaN(peek)) {
         localStorage.setItem("enabled", "true");
-        localStorage.setItem("peek", "2");
+        localStorage.setItem("peek", "3");
         enabled = (localStorage.getItem("enabled") === convertToBool);
         peek = parseInt(localStorage.getItem("peek"));
     }
