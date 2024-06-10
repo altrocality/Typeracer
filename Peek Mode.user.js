@@ -29,13 +29,14 @@ const newTheme = typeof com_typeracer_redesign_Redesign === "function";
 function loadSettings() {
     enabled = (localStorage.getItem("enabled") === convertToBool);
     peek = parseInt(localStorage.getItem("peek"));
-    if (Number.isNaN(peek)) {
+    if (Number.isNaN(peek)) { // Defaults
         localStorage.setItem("enabled", "true");
         localStorage.setItem("peek", "3");
         enabled = (localStorage.getItem("enabled") === convertToBool);
         peek = parseInt(localStorage.getItem("peek"));
     }
 }
+
 function addMenu(displayModes) {
     var menu = document.createElement("tr");
     menu.innerHTML = `
@@ -71,13 +72,6 @@ function raceEnd() {
 }
 
 function status() {
-    document.addEventListener('click', function(a) {
-        if (a.target == document.getElementsByClassName('raceLeaveLink')[0]) {
-            raceEnd();
-            return;
-        }
-    });
-
     // Config
     var displayModes = document.getElementsByClassName('radioButtons')[0];
     var themeMenuOpen = document.getElementsByClassName('gwt-RadioButton classic')[0];
@@ -86,33 +80,41 @@ function status() {
         if (!peekModeOptions) {
             addMenu(displayModes);
         } else {
-            var menuPeek = document.getElementById("peekInput");
+            var menuPeek = parseInt(document.getElementById("peekInput").value);
             var menuEnable = document.getElementById("peekEnable");
-            localStorage.setItem("enabled", menuEnable.checked);
-            localStorage.setItem("peek", menuPeek.value);
-            enabled = (localStorage.getItem("enabled") === convertToBool);
-            peek = parseInt(localStorage.getItem("peek"));
+
+            if (menuPeek != peek) {
+                if (!Number.isNaN(menuPeek)) {
+                    localStorage.setItem("peek", menuPeek);
+                    peek = parseInt(localStorage.getItem("peek"));
+                }
+            }
+            if (menuEnable.checked != enabled) {
+                localStorage.setItem("enabled", menuEnable.checked);
+                enabled = (localStorage.getItem("enabled") === convertToBool);
+            }
         }
     }
 
-    var gameStatusLabels = document.getElementsByClassName('gameStatusLabel');
-    // Not in race lobby?
-    if (!gameStatusLabels[0]) {
-        raceEnd();
-        return;
-    }
-    var gameStatus = gameStatusLabels[0].innerText;
-    if (!racing && (gameStatus == 'Go!' || gameStatus.startsWith('The race is on!'))) {
-        if (enabled) {
+    // From github.com/PoemOnTyperacer/tampermonkey/blob/master/pacemaker.user.js lines 321-339 tyyyy :)
+    let gameStatusLabels = document.getElementsByClassName('gameStatusLabel');
+    let gameStatus = ((gameStatusLabels || [])[0] || {}).innerHTML || '';
+    if (!racing && (gameStatusLabels.length > 0 && (gameStatus == 'Go!' || gameStatus.startsWith('The race is on') || gameStatus == 'The race is about to start!'))) {
+        let practiceTitleEl = document.getElementsByClassName('roomSection')[0];
+        if(practiceTitleEl && practiceTitleEl.innerText.startsWith('Practice')) {
             raceStart();
         } else {
-            return;
+            var countdown = document.getElementsByClassName('lightLabel')[0].parentNode.nextSibling.textContent;
+            if (countdown == ":02") {
+                raceStart();
+            }
         }
     }
 
-    if (racing && gameStatus.startsWith("You finished") || document.getElementsByClassName("txtInput txtInput-unfocused")[0]) {
+    if(racing && ((gameStatusLabels.length==0) || (document.getElementsByClassName('rank')[0].innerText=='Done!'||document.getElementsByClassName('rank')[0].innerText.includes('Place')))){
         raceEnd();
     }
+
 }
 
 function addNext(textDiv, textSpans) {
@@ -120,18 +122,20 @@ function addNext(textDiv, textSpans) {
     var peekedWords = hiddenSpan.textContent.split(" ", peek+1).join(" ")+" ";
     var shownWords = document.createTextNode(peekedWords);
     var currPos = textSpans[textSpans.length-2];
+    var typo = document.getElementsByClassName('txtInput txtInput-error')[0];
 
     if (currPos.textContent != peekedWords) {
         var shownSpan = document.createElement("span");
         if (currPos.textContent == " ") {
+            console.log("otnheun");
             // At end of word
             shownWords = document.createTextNode(hiddenSpan.textContent.split(" ", peek).join(" ")+" ");
             shownSpan.appendChild(shownWords);
             currPos.parentNode.insertBefore(shownSpan, currPos.nextSibling);
             shownSpan.className = "nextWords";
         }
-        if ((currPos.textContent.match(/ /g)||[]).length != peek) {
-            // Avoids adding another shownSpan if at end of word
+        if ((currPos.textContent.match(/ /g)||[]).length != peek) { // Avoids adding another shownSpan if at end of word
+            console.log("orhusonathnst");
             shownSpan.appendChild(shownWords);
             currPos.parentNode.insertBefore(shownSpan, currPos.nextSibling);
             shownSpan.className = "nextWords";
@@ -142,7 +146,6 @@ function addNext(textDiv, textSpans) {
 function peekNext() {
     var textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
     var textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
-    var words = textSpans[textSpans.length-1].textContent;
 
     // Maintaining initial height
     textDiv.setAttribute("style", "height: "+initHeight+"px");
@@ -176,4 +179,4 @@ function peekNext() {
 }
 
 loadSettings();
-setInterval(status, 100);
+setInterval(status, status);
