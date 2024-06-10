@@ -179,4 +179,4 @@ function peekNext() {
 }
 
 loadSettings();
-setInterval(status, status);
+setInterval(status, 100);
