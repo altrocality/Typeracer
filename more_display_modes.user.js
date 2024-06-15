@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.1.2
+// @version      1.1.3
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Shows the current and next 'n' words
@@ -61,7 +61,6 @@ function addMenu(displayModes) {
 function raceStart() {
     racing = true;
     var textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
-
     var textDivRect = textDiv.getBoundingClientRect();
     initHeight = textDivRect.height;
 
@@ -79,7 +78,6 @@ function addNext(textDiv, textSpans) {
     var peekedWords = hiddenSpan.textContent.split(" ", peek+1).join(" ")+" ";
     var shownWords = document.createTextNode(peekedWords);
     var currPos = textSpans[textSpans.length-2];
-    var typo = document.getElementsByClassName('txtInput txtInput-error')[0];
 
     if (currPos.textContent != peekedWords) {
         var shownSpan = document.createElement("span");
@@ -132,8 +130,6 @@ function peekNext() {
     addNext(textDiv, textSpans);
 }
 
-loadSettings();
-
 // Detecting game status
 var observer = new MutationObserver(function() {
     // Modified from github.com/PoemOnTyperacer/tampermonkey/blob/master/pacemaker.user.js lines 321-339 tyyyy :)
@@ -145,10 +141,17 @@ var observer = new MutationObserver(function() {
             if (!switchedToMain) {
                 raceStart();
             }
-            document.getElementsByClassName('gwt-Anchor')[4].addEventListener('click', function () {
-                raceEnd();
-                switchedToMain = true;
-            });
+            if (newTheme) {
+                document.getElementsByClassName('gwt-Anchor')[3].addEventListener('click', function () {
+                    raceEnd();
+                    switchedToMain = true;
+                });
+            } else {
+                document.getElementsByClassName('gwt-Anchor')[4].addEventListener('click', function () {
+                    raceEnd();
+                    switchedToMain = true;
+                });
+            }
         } else {
             // In a public lobby
             switchedToMain = false;
@@ -188,4 +191,5 @@ var observer = new MutationObserver(function() {
         }
     }
 });
+loadSettings();
 observer.observe(document, {attributes: false, childList: true, characterData: false, subtree: true});
