@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.1.3
+// @version      1.1.4
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Shows the current and next 'n' words
@@ -64,8 +64,12 @@ function raceStart() {
     var textDivRect = textDiv.getBoundingClientRect();
     initHeight = textDivRect.height;
 
+    if (!enabled) {
+        return;
+    }
     var config = {subtree: true, childList: true};
     doPeekNext.observe(textDiv, config);
+    peekNext();
 }
 
 function raceEnd() {
@@ -110,12 +114,7 @@ function peekNext() {
         // Read ahead covers rest of text -> quit
         return;
     }
-    // Disabled during race?
-    if (!enabled) {
-        document.getElementsByClassName("nextWords")[0].remove();
-        raceEnd();
-        return;
-    }
+
     // Hide upcoming words
     textDiv.style.visibility = "hidden";
     for (var i = 0; i < (textSpans.length-1); i++) {
@@ -158,7 +157,6 @@ var observer = new MutationObserver(function() {
             var countdown = document.getElementsByClassName('lightLabel')[0].parentNode.nextSibling.textContent;
             if (countdown == ":03") {
                 raceStart();
-                peekNext();
             }
         }
     }
@@ -171,6 +169,7 @@ var observer = new MutationObserver(function() {
     var displayModes = document.getElementsByClassName('radioButtons')[0];
     var themeMenuOpen = document.getElementsByClassName('gwt-RadioButton classic')[0];
     var peekModeOptions = document.getElementsByClassName("peekModeOptions")[0];
+    let textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
     if (displayModes && !themeMenuOpen) {
         if (!peekModeOptions) {
             addMenu(displayModes);
@@ -182,11 +181,22 @@ var observer = new MutationObserver(function() {
                 if (!Number.isNaN(menuPeek)) {
                     localStorage.setItem("peek", menuPeek);
                     peek = parseInt(localStorage.getItem("peek"));
+                    document.getElementsByClassName("nextWords")[0].remove();
+                    peekNext();
                 }
             }
             if (menuEnable.checked != enabled) {
                 localStorage.setItem("enabled", menuEnable.checked);
                 enabled = (localStorage.getItem("enabled") === convertToBool);
+                if (enabled) {
+                    var config = {subtree: true, childList: true};
+                    doPeekNext.observe(textDiv, config);
+                    peekNext();
+                } else {
+                    document.getElementsByClassName("nextWords")[0].remove();
+                    textDiv.style.visibility = "visible";
+                    doPeekNext.disconnect();
+                }
             }
         }
     }
