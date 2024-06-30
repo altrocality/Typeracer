@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.1.4
+// @version      1.1.5
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Shows the current and next 'n' words
@@ -45,8 +45,8 @@ function addMenu(displayModes) {
     menu.innerHTML = `
     <td>
          <input type="checkbox" id="peekEnable" style="vertical-align:middle">
-         <b>Peek: </b>
-         <span> Show the next </span>
+         <b>Peek</b>:
+         <span>Show the next </span>
          <input type="text" id="peekInput" style="width:2em; text-align:center;">
          <span> words</span>
     </td>
@@ -111,26 +111,14 @@ function peekNext() {
     var hiddenSpan = textSpans[textSpans.length-1];
     var hiddenSpanNum = (hiddenSpan.textContent.match(/ /g)||[]).length;
     if (peek >= hiddenSpanNum) {
-        // Read ahead covers rest of text -> quit
         return;
     }
-
-    // Hide upcoming words
-    textDiv.style.visibility = "hidden";
-    for (var i = 0; i < (textSpans.length-1); i++) {
-        textSpans[i].style.visibility = "visible";
-    }
-
-    // Don't hide smooth caret in new theme
-    var smoothCaret = document.getElementById("smoothCaret");
-    if (newTheme && smoothCaret) {
-        document.getElementById("smoothCaret").style.visibility = "visible";
-    }
+    hiddenSpan.style.visibility = "hidden";
     addNext(textDiv, textSpans);
 }
 
 // Detecting game status
-var observer = new MutationObserver(function() {
+var observer = new MutationObserver(() => {
     // Modified from github.com/PoemOnTyperacer/tampermonkey/blob/master/pacemaker.user.js lines 321-339 tyyyy :)
     let gameStatusLabels = document.getElementsByClassName('gameStatusLabel');
     let gameStatus = ((gameStatusLabels || [])[0] || {}).innerHTML || '';
@@ -202,4 +190,4 @@ var observer = new MutationObserver(function() {
     }
 });
 loadSettings();
-observer.observe(document, {attributes: false, childList: true, characterData: false, subtree: true});
+observer.observe(document, {childList: true, subtree: true});
