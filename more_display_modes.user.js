@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.1.5
+// @version      1.1.6
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Shows the current and next 'n' words
@@ -182,7 +182,8 @@ var observer = new MutationObserver(() => {
                     peekNext();
                 } else {
                     document.getElementsByClassName("nextWords")[0].remove();
-                    textDiv.style.visibility = "visible";
+                    let textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
+                    textSpans[textSpans.length-1].style.visibility = "visible";
                     doPeekNext.disconnect();
                 }
             }
