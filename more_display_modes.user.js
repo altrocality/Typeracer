@@ -1,120 +1,204 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.1.6
+// @version      1.2.0
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
-// @description  Shows the current and next 'n' words
+// @description  Adds peek mode and more.
 // @author       altrocality
 // @match        https://play.typeracer.com/*
 // @match        https://staging.typeracer.com/*
 // @icon         https://www.google.com/s2/favicons?domain=typeracer.com
 // ==/UserScript==
+const settings = {
+    plusEnable: true,
+    plusLength: 3,
+    hideTyped: false
+};
 
-/////////////////////////////////////////////////////////////////////////////
-//  To change the settings, press 'change display format' when in a race.  //
-//                                                                         //
-//  If you're using poem's smooth caret, to access the menu:               //
-//      1. Select the quote input box                                      //
-//      2. Press shift + tab, then enter                                   //
-/////////////////////////////////////////////////////////////////////////////
+let racing = false;
+let textDiv;
+let textSpans;
+let height;
+let switchedToMain = false;
 
-var peek;
-var enabled;
+let wordPos = -1;
+let currWord;
+let extraTypoChars = [];
+let firstWord = true;
+let typoFromStart = false;
+let newTypo = true;
 
-var convertToBool = "true";
-var racing = false;
-var initHeight;
-var switchedToMain = false;
-const doPeekNext = new MutationObserver(peekNext);
 const newTheme = typeof com_typeracer_redesign_Redesign === "function";
 
-function loadSettings() {
-    enabled = (localStorage.getItem("enabled") === convertToBool);
-    peek = parseInt(localStorage.getItem("peek"));
-    if (Number.isNaN(peek)) { // Defaults
-        localStorage.setItem("enabled", "true");
-        localStorage.setItem("peek", "3");
-        enabled = (localStorage.getItem("enabled") === convertToBool);
-        peek = parseInt(localStorage.getItem("peek"));
+const monitorRace = new MutationObserver(doMode);
+
+function getNumTyped(wordPos) {
+    if (wordPos === 0) return 0;
+    let numTyped = document.getElementsByClassName('txtInput')[0].value.length;
+    if (!firstWord) {
+        numTyped += textSpans[0].textContent.length;
+    }
+    return numTyped;
+}
+
+function hideTyped(wordPos) {
+    if (!firstWord) {
+        textSpans[0].style.visibility = "hidden";
     }
 }
 
-function addMenu(displayModes) {
-    var menu = document.createElement("tr");
-    menu.innerHTML = `
-    <td>
-         <input type="checkbox" id="peekEnable" style="vertical-align:middle">
-         <b>Peek</b>:
-         <span>Show the next </span>
-         <input type="text" id="peekInput" style="width:2em; text-align:center;">
-         <span> words</span>
-    </td>
-    `;
-    menu.className = "peekModeOptions";
-    displayModes.append(menu);
-    menu.style = "inherit";
-    document.getElementById("peekInput").value = peek;
-    document.getElementById("peekEnable").checked = enabled;
+function plusMode() {
+    const remainingSpan = textSpans[textSpans.length-1];
+    const numRemaining = (remainingSpan.textContent.match(/ /g)||[]).length;
+    if (settings.plusLength >= numRemaining) {
+        return;
+    }
+    remainingSpan.style.visibility = "hidden";
+
+    const currPos = textSpans[textSpans.length-2];
+    let plusWords = remainingSpan.textContent.split(" ", settings.plusLength+1).join(" ")+" ";
+    let newTextNode = document.createTextNode(plusWords);
+
+    if (currPos.textContent !== plusWords) {
+        const newSpan = document.createElement("span");
+        if (currPos.textContent == " ") {
+            newTextNode = document.createTextNode(remainingSpan.textContent.split(" ", settings.plusLength).join(" ")+" ");
+            newSpan.appendChild(newTextNode);
+            currPos.parentNode.insertBefore(newSpan, currPos.nextSibling);
+            newSpan.className = `plus${settings.plusLength}`;
+        }
+        if ((currPos.textContent.match(/ /g)||[]).length != settings.plusLength) {
+            newSpan.appendChild(newTextNode);
+            currPos.parentNode.insertBefore(newSpan, currPos.nextSibling);
+            newSpan.className = `plus${settings.plusLength}`;
+        }
+    }
+}
+
+function getCurrWord(currWord, wordPos) {
+    if (wordPos >= 7) return currWord;
+    if (wordPos > 1) return currWord;
+    currWord = '';
+    if (!textSpans[0].textContent.includes(' ') || textSpans[0].textContent.length === 1) {
+        currWord = textSpans[0].textContent;
+    }
+
+    let maxIndex = textSpans.length-1;
+    // Avoids including the 'plusN' span in forming currWord
+    if (document.getElementsByClassName(`plus${settings.plusLength}`)[0]) {
+        maxIndex--;
+    }
+
+    for (let i = 1; i < maxIndex; i++) {
+        let currSpan = textSpans[i];
+        if (currSpan.textContent.includes(' ')) break;
+        if (currSpan.className === 'typos') break;
+        currWord += textSpans[i].textContent;
+    }
+    const remainingText = textSpans[textSpans.length-1].textContent;
+    if (remainingText.startsWith(',') || remainingText.startsWith(';')) {
+        currWord += remainingText[0];
+    }
+    return currWord;
+}
+
+function getPos(currWord, wordPos) {
+    /*
+    0 - start of quote
+    1 - beginning of word
+    2 - middle of word no typo
+    3 - end of word
+    4 - typo from start of word
+    5 - typo from middle of word
+    6 - typo at end of word
+    7 - typo from start and beyond word length
+    8 - typo from middle and beyond word length
+    9 - new typo beyond word length
+*/
+
+    let typo = document.getElementsByClassName('txtInput txtInput-error')[0];
+    let currWordAttempt = typo || document.getElementsByClassName('txtInput')[0];
+    currWordAttempt = currWordAttempt.value;
+    if (currWordAttempt === 'Type the above text here when the race begins') return 0;
+
+    if (typo) {
+        if (newTypo) {
+            newTypo = false;
+            if (currWordAttempt.length > currWord.length) {
+                extraTypoChars = currWordAttempt.substr(currWord.length);
+                return 9;
+            }
+        }
+        if (typoFromStart) {
+            if (currWordAttempt.length > currWord.length) {
+                extraTypoChars = currWordAttempt.substr(currWord.length);
+                return 7;
+            }
+            return 4;
+        }
+        if (currWordAttempt.length === 1) {
+            typoFromStart = true;
+            return 4;
+        }
+        if (currWordAttempt.length < currWord.length) return 5;
+        if (currWordAttempt.length === currWord.length) return 6;
+        if (currWordAttempt.length > currWord.length) {
+            extraTypoChars = currWordAttempt.substr(currWord.length);
+            if (wordPos === 9) return 9;
+            return 8;
+        }
+    } else {
+        newTypo = true;
+        if (currWordAttempt.length === 0) {
+            typoFromStart = false;
+            if (!textSpans[0].textContent.includes(' ')) return 0;
+            firstWord = false;
+            return 1;
+        }
+        if (currWordAttempt.length < currWord.length) return 2;
+        if (currWordAttempt.length === currWord.length) return 3;
+    }
+}
+
+function doMode() {
+
+    textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
+    textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
+
+    textDiv.style.height = `${height}px`;
+    textDiv.style.position = 'relative';
+    textDiv.style.visibility = "visible";
+
+    currWord = getCurrWord(currWord, wordPos);
+    wordPos = getPos(currWord, wordPos);
+    if (settings.plusEnable) {
+        plusMode();
+    }
+    if (settings.hideTyped) {
+        hideTyped(wordPos);
+    }
 }
 
 function raceStart() {
     racing = true;
-    var textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
-    var textDivRect = textDiv.getBoundingClientRect();
-    initHeight = textDivRect.height;
-
-    if (!enabled) {
-        return;
+    textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
+    textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
+    // Getting height to maintain
+    if (settings.plusEnable) {
+        height = textDiv.getBoundingClientRect().height;
     }
-    var config = {subtree: true, childList: true};
-    doPeekNext.observe(textDiv, config);
-    peekNext();
+    doMode();
+    monitorRace.observe(textDiv, {subtree: true, childList: true});
 }
 
 function raceEnd() {
-    doPeekNext.disconnect();
+    monitorRace.disconnect();
     racing = false;
-}
-
-function addNext(textDiv, textSpans) {
-    var hiddenSpan = textSpans[textSpans.length-1];
-    var peekedWords = hiddenSpan.textContent.split(" ", peek+1).join(" ")+" ";
-    var shownWords = document.createTextNode(peekedWords);
-    var currPos = textSpans[textSpans.length-2];
-
-    if (currPos.textContent != peekedWords) {
-        var shownSpan = document.createElement("span");
-        if (currPos.textContent == " ") {
-            // At end of word
-            shownWords = document.createTextNode(hiddenSpan.textContent.split(" ", peek).join(" ")+" ");
-            shownSpan.appendChild(shownWords);
-            currPos.parentNode.insertBefore(shownSpan, currPos.nextSibling);
-            shownSpan.className = "nextWords";
-        }
-        if ((currPos.textContent.match(/ /g)||[]).length != peek) {
-            shownSpan.appendChild(shownWords);
-            currPos.parentNode.insertBefore(shownSpan, currPos.nextSibling);
-            shownSpan.className = "nextWords";
-        }
-    }
-}
-
-function peekNext() {
-    var textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
-    var textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
-
-    // Maintaining initial height
-    textDiv.setAttribute("style", "height: "+initHeight+"px");
-    textDiv.style.position = "relative";
-
-    var hiddenSpan = textSpans[textSpans.length-1];
-    var hiddenSpanNum = (hiddenSpan.textContent.match(/ /g)||[]).length;
-    if (peek >= hiddenSpanNum) {
-        return;
-    }
-    hiddenSpan.style.visibility = "hidden";
-    addNext(textDiv, textSpans);
+    height = -1;
+    wordPos = -1;
+    firstWord = true;
+    typoFromStart = false;
 }
 
 // Detecting game status
@@ -142,8 +226,8 @@ var observer = new MutationObserver(() => {
         } else {
             // In a public lobby
             switchedToMain = false;
-            var countdown = document.getElementsByClassName('lightLabel')[0].parentNode.nextSibling.textContent;
-            if (countdown == ":03") {
+            var countdown = parseInt(document.getElementsByClassName('lightLabel')[0].parentNode.nextSibling.textContent.substr(-1));
+            if (countdown <= 3 && countdown !== 0) {
                 raceStart();
             }
         }
@@ -152,43 +236,5 @@ var observer = new MutationObserver(() => {
     if(racing && ((gameStatusLabels.length==0) || (document.getElementsByClassName('rank')[0].innerText=='Done!'|| document.getElementsByClassName('rank')[0].innerText.includes('Place')))){
         raceEnd();
     }
-
-    // Config
-    var displayModes = document.getElementsByClassName('radioButtons')[0];
-    var themeMenuOpen = document.getElementsByClassName('gwt-RadioButton classic')[0];
-    var peekModeOptions = document.getElementsByClassName("peekModeOptions")[0];
-    let textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
-    if (displayModes && !themeMenuOpen) {
-        if (!peekModeOptions) {
-            addMenu(displayModes);
-        } else {
-            var menuPeek = parseInt(document.getElementById("peekInput").value);
-            var menuEnable = document.getElementById("peekEnable");
-
-            if (menuPeek != peek) {
-                if (!Number.isNaN(menuPeek)) {
-                    localStorage.setItem("peek", menuPeek);
-                    peek = parseInt(localStorage.getItem("peek"));
-                    document.getElementsByClassName("nextWords")[0].remove();
-                    peekNext();
-                }
-            }
-            if (menuEnable.checked != enabled) {
-                localStorage.setItem("enabled", menuEnable.checked);
-                enabled = (localStorage.getItem("enabled") === convertToBool);
-                if (enabled) {
-                    var config = {subtree: true, childList: true};
-                    doPeekNext.observe(textDiv, config);
-                    peekNext();
-                } else {
-                    document.getElementsByClassName("nextWords")[0].remove();
-                    let textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
-                    textSpans[textSpans.length-1].style.visibility = "visible";
-                    doPeekNext.disconnect();
-                }
-            }
-        }
-    }
 });
-loadSettings();
 observer.observe(document, {childList: true, subtree: true});
