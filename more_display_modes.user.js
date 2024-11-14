@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
+// @version      1.2.1
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds peek mode and more.
@@ -13,7 +13,8 @@
 const settings = {
     plusEnable: true,
     plusLength: 3,
-    hideTyped: false
+    hideTyped: false,
+    correctColor: '' // Changes the correctly typed characters to this color
 };
 
 let racing = false;
@@ -32,21 +33,6 @@ let newTypo = true;
 const newTheme = typeof com_typeracer_redesign_Redesign === "function";
 
 const monitorRace = new MutationObserver(doMode);
-
-function getNumTyped(wordPos) {
-    if (wordPos === 0) return 0;
-    let numTyped = document.getElementsByClassName('txtInput')[0].value.length;
-    if (!firstWord) {
-        numTyped += textSpans[0].textContent.length;
-    }
-    return numTyped;
-}
-
-function hideTyped(wordPos) {
-    if (!firstWord) {
-        textSpans[0].style.visibility = "hidden";
-    }
-}
 
 function plusMode() {
     const remainingSpan = textSpans[textSpans.length-1];
@@ -73,6 +59,24 @@ function plusMode() {
             currPos.parentNode.insertBefore(newSpan, currPos.nextSibling);
             newSpan.className = `plus${settings.plusLength}`;
         }
+    }
+}
+
+function hideTyped(wordPos) {
+    if (!firstWord) {
+        textSpans[0].style.visibility = "hidden";
+    }
+}
+
+function setCorrectColor() {
+    if (wordPos === 0) return;
+    if (firstWord && (wordPos === 4 || wordPos === 7)) return;
+
+    let currCorrColor = window.getComputedStyle(textSpans[0]).color;
+    for (let i = 0; i < textSpans.length; i++) {
+        let color = window.getComputedStyle(textSpans[i]).color;
+        if (color !== currCorrColor) break;
+        textSpans[i].style.color = settings.correctColor;
     }
 }
 
@@ -177,6 +181,9 @@ function doMode() {
     }
     if (settings.hideTyped) {
         hideTyped(wordPos);
+    }
+    if (settings.correctColor) {
+        setCorrectColor();
     }
 }
 
