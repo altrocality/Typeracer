@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.0
+// @version      1.3.1
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds peek mode, line scroll and more.
@@ -27,6 +27,8 @@ let switchedToMain = false;
 let lineShift;
 let lineHeight;
 let currRangeHeight;
+let lineStartPos;
+let currLine;
 
 let wordPos = -1;
 let currWord;
@@ -38,6 +40,26 @@ let newTypo = true;
 const newTheme = typeof com_typeracer_redesign_Redesign === "function";
 
 const monitorRace = new MutationObserver(doMode);
+
+function getCurrSpanIndex() {
+    let i = 0;
+
+    if (wordPos <= 4) {
+        i = 0;
+    } else if (wordPos <= 7 || wordPos === 9) {
+        i = 1;
+    } else if (wordPos === 8) {
+        i = 2;
+    }
+
+    if (!firstWord && wordPos !== 1) {
+        i++;
+    }
+    if (wordPos === 3 && (currWord[currWord.length-1] === ',' || currWord[currWord.length-1] === ';')) {
+        i++;
+    }
+    return i;
+}
 
 function plusMode() {
     const remainingSpan = textSpans[textSpans.length-1];
@@ -84,7 +106,8 @@ function lineScroll() {
     range.setEnd(nextWord, 0);
 
     let rangeHeight = Math.floor(range.getBoundingClientRect().height);
-    if (rangeHeight > currRangeHeight) {
+    let xPos = textSpans[getCurrSpanIndex()+1].getBoundingClientRect().x;
+    if (rangeHeight > currRangeHeight && xPos === lineStartPos) {
         textDiv.style.transition = 'top 0.1s ease-out';
         textDiv.style.top = `${lineShift}px`;
         lineShift -= lineHeight;
@@ -229,6 +252,7 @@ function raceStart() {
         height = 3 * lineHeight;
         currRangeHeight = lineHeight;
         lineShift = 0;
+        lineStartPos = textSpans[0].getBoundingClientRect().x;
     } else if (settings.plusEnable) {
         height = textDiv.getBoundingClientRect().height;
     }
