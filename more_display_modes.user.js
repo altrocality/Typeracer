@@ -1,20 +1,21 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.2.1
+// @version      1.3.0
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
-// @description  Adds peek mode and more.
+// @description  Adds peek mode, line scroll and more.
 // @author       altrocality
 // @match        https://play.typeracer.com/*
 // @match        https://staging.typeracer.com/*
 // @icon         https://www.google.com/s2/favicons?domain=typeracer.com
 // ==/UserScript==
 const settings = {
-    plusEnable: true,
+    plusEnable: false,
     plusLength: 3,
     hideTyped: false,
-    correctColor: '' // Changes the correctly typed characters to this color
+    lineScroll: true,
+    correctColor: ''
 };
 
 let racing = false;
@@ -22,6 +23,10 @@ let textDiv;
 let textSpans;
 let height;
 let switchedToMain = false;
+
+let lineShift;
+let lineHeight;
+let currRangeHeight;
 
 let wordPos = -1;
 let currWord;
@@ -68,6 +73,24 @@ function hideTyped(wordPos) {
     }
 }
 
+function lineScroll() {
+    let i = textSpans.length-1;
+    if (settings.plusEnable) {
+        i--;
+    }
+    let nextWord = textSpans[i];
+    let range = document.createRange();
+    range.setStart(textSpans[0], 0);
+    range.setEnd(nextWord, 0);
+
+    let rangeHeight = Math.floor(range.getBoundingClientRect().height);
+    if (rangeHeight > currRangeHeight) {
+        textDiv.style.transition = 'top 0.1s ease-out';
+        textDiv.style.top = `${lineShift}px`;
+        lineShift -= lineHeight;
+        currRangeHeight = rangeHeight;
+    }
+}
 function setCorrectColor() {
     if (wordPos === 0) return;
     if (firstWord && (wordPos === 4 || wordPos === 7)) return;
@@ -166,14 +189,20 @@ function getPos(currWord, wordPos) {
 }
 
 function doMode() {
-
     textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
     textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
 
-    textDiv.style.height = `${height}px`;
+    let divHeight = Math.floor(textDiv.getBoundingClientRect().height);
+    if (!(settings.lineScroll && divHeight < height)) {
+        textDiv.style.height = `${height}px`;
+    }
     textDiv.style.position = 'relative';
     textDiv.style.visibility = "visible";
 
+    if (settings.lineScroll) {
+        textDiv.children[0].style.marginTop = '0px';
+        textDiv.parentNode.style.overflowY = 'hidden';
+    }
     currWord = getCurrWord(currWord, wordPos);
     wordPos = getPos(currWord, wordPos);
     if (settings.plusEnable) {
@@ -181,6 +210,9 @@ function doMode() {
     }
     if (settings.hideTyped) {
         hideTyped(wordPos);
+    }
+    if (settings.lineScroll) {
+        lineScroll();
     }
     if (settings.correctColor) {
         setCorrectColor();
@@ -192,7 +224,12 @@ function raceStart() {
     textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
     textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
     // Getting height to maintain
-    if (settings.plusEnable) {
+    if (settings.lineScroll) {
+        lineHeight = Math.ceil(textSpans[0].getBoundingClientRect().height)+0.7;
+        height = 3 * lineHeight;
+        currRangeHeight = lineHeight;
+        lineShift = 0;
+    } else if (settings.plusEnable) {
         height = textDiv.getBoundingClientRect().height;
     }
     doMode();
