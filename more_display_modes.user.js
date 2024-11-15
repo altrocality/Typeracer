@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.1
+// @version      1.3.2
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds peek mode, line scroll and more.
@@ -29,6 +29,8 @@ let lineHeight;
 let currRangeHeight;
 let lineStartPos;
 let currLine;
+let prevXPos;
+let prevYPos;
 
 let wordPos = -1;
 let currWord;
@@ -96,24 +98,21 @@ function hideTyped(wordPos) {
 }
 
 function lineScroll() {
-    let i = textSpans.length-1;
-    if (settings.plusEnable) {
-        i--;
-    }
-    let nextWord = textSpans[i];
-    let range = document.createRange();
-    range.setStart(textSpans[0], 0);
-    range.setEnd(nextWord, 0);
+    if (document.activeElement !== document.getElementsByClassName('txtInput')[0]) return;
+    let currChar = textSpans[getCurrSpanIndex()+1];
+    let xPos = currChar.getBoundingClientRect().x;
+    let yPos = currChar.getBoundingClientRect().y;
 
-    let rangeHeight = Math.floor(range.getBoundingClientRect().height);
-    let xPos = textSpans[getCurrSpanIndex()+1].getBoundingClientRect().x;
-    if (rangeHeight > currRangeHeight && xPos === lineStartPos) {
+    let typo = document.getElementsByClassName('txtInput txtInput-error')[0];
+    if (xPos < prevXPos && yPos > prevYPos && !typo) {
         textDiv.style.transition = 'top 0.1s ease-out';
         textDiv.style.top = `${lineShift}px`;
         lineShift -= lineHeight;
-        currRangeHeight = rangeHeight;
     }
+    prevXPos = xPos;
+    prevYPos = yPos;
 }
+
 function setCorrectColor() {
     if (wordPos === 0) return;
     if (firstWord && (wordPos === 4 || wordPos === 7)) return;
@@ -224,7 +223,7 @@ function doMode() {
 
     if (settings.lineScroll) {
         textDiv.children[0].style.marginTop = '0px';
-        textDiv.parentNode.style.overflowY = 'hidden';
+        textDiv.parentNode.style.overflowY = 'clip';
     }
     currWord = getCurrWord(currWord, wordPos);
     wordPos = getPos(currWord, wordPos);
