@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.3
+// @version      1.3.4
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds peek mode, line scroll and more.
@@ -109,7 +109,7 @@ function lineScroll() {
     let yPos = currChar.getBoundingClientRect().y;
 
     let typo = document.getElementsByClassName('txtInput txtInput-error')[0];
-    if (xPos < prevXPos && yPos > prevYPos && !typo) {
+    if (xPos < prevXPos && yPos > prevYPos && !typo && !firstWord) {
         textDiv.style.transition = 'top 0.1s ease-out';
         textDiv.style.top = `${lineShift}px`;
         lineShift -= lineHeight;
