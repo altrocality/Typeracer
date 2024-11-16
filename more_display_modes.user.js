@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.4
+// @version      1.3.5
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
-// @description  Adds peek mode, line scroll and more.
+// @description  Adds plus mode, line scroll and more.
 // @author       altrocality
 // @match        https://play.typeracer.com/*
 // @match        https://staging.typeracer.com/*
@@ -26,11 +26,9 @@ let switchedToMain = false;
 
 let lineShift;
 let lineHeight;
-let currRangeHeight;
-let lineStartPos;
-let currLine;
 let prevXPos;
 let prevYPos;
+let midWordScroll;
 
 let wordPos = -1;
 let currWord;
@@ -110,9 +108,15 @@ function lineScroll() {
 
     let typo = document.getElementsByClassName('txtInput txtInput-error')[0];
     if (xPos < prevXPos && yPos > prevYPos && !typo && !firstWord) {
-        textDiv.style.transition = 'top 0.1s ease-out';
-        textDiv.style.top = `${lineShift}px`;
-        lineShift -= lineHeight;
+        if (!(midWordScroll && wordPos !== 1)) {
+            midWordScroll = false;
+            textDiv.style.transition = 'top 0.1s ease-out';
+            textDiv.style.top = `${lineShift}px`;
+            lineShift -= lineHeight;
+        }
+        if (wordPos !== 1) {
+            midWordScroll = true;
+        }
     }
     prevXPos = xPos;
     prevYPos = yPos;
@@ -254,9 +258,8 @@ function raceStart() {
     if (settings.lineScroll) {
         lineHeight = Math.ceil(textSpans[0].getBoundingClientRect().height)+0.7;
         height = 3 * lineHeight;
-        currRangeHeight = lineHeight;
         lineShift = 0;
-        lineStartPos = textSpans[0].getBoundingClientRect().x;
+        midWordScroll = false;
     } else if (settings.plusEnable) {
         height = textDiv.getBoundingClientRect().height;
     }
