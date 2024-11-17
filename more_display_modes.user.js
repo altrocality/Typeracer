@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.5
+// @version      1.3.6
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds plus mode, line scroll and more.
@@ -21,7 +21,9 @@ const settings = {
 let racing = false;
 let textDiv;
 let textSpans;
-let height;
+let divHeight;
+let plusHeight;
+let lineScrollHeight;
 let switchedToMain = false;
 
 let lineShift;
@@ -103,14 +105,14 @@ function lineScroll() {
     }
     if (document.activeElement !== document.getElementsByClassName('txtInput')[0]) return;
     let currChar = textSpans[getCurrSpanIndex()+1];
+    if (!currChar) return;
     let xPos = currChar.getBoundingClientRect().x;
     let yPos = currChar.getBoundingClientRect().y;
-
     let typo = document.getElementsByClassName('txtInput txtInput-error')[0];
     if (xPos < prevXPos && yPos > prevYPos && !typo && !firstWord) {
         if (!(midWordScroll && wordPos !== 1)) {
             midWordScroll = false;
-            textDiv.style.transition = 'top 0.1s ease-out';
+            textDiv.style.transition = 'top 0.2s ease';
             textDiv.style.top = `${lineShift}px`;
             lineShift -= lineHeight;
         }
@@ -223,10 +225,16 @@ function doMode() {
     textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
     textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
 
-    let divHeight = Math.floor(textDiv.getBoundingClientRect().height);
-    if (!(settings.lineScroll && divHeight < height)) {
-        textDiv.style.height = `${height}px`;
+    if (!divHeight) {
+        divHeight = Math.floor(textDiv.getBoundingClientRect().height);
     }
+    let height;
+    if (divHeight > lineScrollHeight) {
+        height = lineScrollHeight;
+    } else {
+        height = plusHeight;
+    }
+    textDiv.style.height = `${height}px`;
     textDiv.style.position = 'relative';
     textDiv.style.visibility = "visible";
 
@@ -257,11 +265,12 @@ function raceStart() {
     // Getting height to maintain
     if (settings.lineScroll) {
         lineHeight = Math.ceil(textSpans[0].getBoundingClientRect().height)+0.7;
-        height = 3 * lineHeight;
+        lineScrollHeight = 3 * lineHeight;
         lineShift = 0;
         midWordScroll = false;
-    } else if (settings.plusEnable) {
-        height = textDiv.getBoundingClientRect().height;
+    }
+    if (settings.plusEnable) {
+        plusHeight = textDiv.getBoundingClientRect().height;
     }
     doMode();
     monitorRace.observe(textDiv, {subtree: true, childList: true});
@@ -270,7 +279,9 @@ function raceStart() {
 function raceEnd() {
     monitorRace.disconnect();
     racing = false;
-    height = -1;
+    divHeight = '';
+    lineScrollHeight = -1;
+    plusHeight = -1;
     wordPos = -1;
     firstWord = true;
     typoFromStart = false;
