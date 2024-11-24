@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.6
+// @version      1.3.7
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds plus mode, line scroll and more.
@@ -31,6 +31,7 @@ let lineHeight;
 let prevXPos;
 let prevYPos;
 let midWordScroll;
+let doScroll;
 
 let wordPos = -1;
 let currWord;
@@ -98,11 +99,6 @@ function hideTyped(wordPos) {
 }
 
 function lineScroll() {
-    let boxOne = textDiv.children[1];
-    let boxTwo = textDiv.children[2];
-    if ((boxOne && boxTwo)) {
-        lineHeight = boxTwo.getBoundingClientRect().top - boxOne.getBoundingClientRect().top;
-    }
     if (document.activeElement !== document.getElementsByClassName('txtInput')[0]) return;
     let currChar = textSpans[getCurrSpanIndex()+1];
     if (!currChar) return;
@@ -224,24 +220,31 @@ function getPos(currWord, wordPos) {
 function doMode() {
     textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
     textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
-
-    if (!divHeight) {
-        divHeight = Math.floor(textDiv.getBoundingClientRect().height);
+    if (settings.lineScroll) {
+        if (textDiv.children.length >= 4) {
+            let boxOne = textDiv.children[1];
+            let boxTwo = textDiv.children[2];
+            lineHeight = boxTwo.getBoundingClientRect().top - boxOne.getBoundingClientRect().top;
+            lineScrollHeight = 3 * lineHeight;
+            doScroll = true;
+            textDiv.children[0].style.marginTop = '0px';
+            textDiv.parentNode.style.marginTop = '0px';
+            textDiv.parentNode.style.paddingTop = '0px';
+            textDiv.parentNode.style.overflowY = 'clip';
+        } else {
+            doScroll = false;
+        }
     }
     let height;
-    if (divHeight > lineScrollHeight) {
+    if (doScroll) {
         height = lineScrollHeight;
-    } else {
+    } else if (settings.plusEnable) {
         height = plusHeight;
     }
     textDiv.style.height = `${height}px`;
     textDiv.style.position = 'relative';
     textDiv.style.visibility = "visible";
 
-    if (settings.lineScroll) {
-        textDiv.children[0].style.marginTop = '0px';
-        textDiv.parentNode.style.overflowY = 'clip';
-    }
     currWord = getCurrWord(currWord, wordPos);
     wordPos = getPos(currWord, wordPos);
     if (settings.plusEnable) {
@@ -250,7 +253,7 @@ function doMode() {
     if (settings.hideTyped) {
         hideTyped(wordPos);
     }
-    if (settings.lineScroll) {
+    if (doScroll) {
         lineScroll();
     }
     if (settings.correctColor) {
@@ -264,8 +267,6 @@ function raceStart() {
     textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
     // Getting height to maintain
     if (settings.lineScroll) {
-        lineHeight = Math.ceil(textSpans[0].getBoundingClientRect().height)+0.7;
-        lineScrollHeight = 3 * lineHeight;
         lineShift = 0;
         midWordScroll = false;
     }
@@ -279,12 +280,12 @@ function raceStart() {
 function raceEnd() {
     monitorRace.disconnect();
     racing = false;
-    divHeight = '';
     lineScrollHeight = -1;
     plusHeight = -1;
     wordPos = -1;
     firstWord = true;
     typoFromStart = false;
+    doScroll = false;
 }
 
 // Detecting game status
