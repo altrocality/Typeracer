@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.8
+// @version      1.3.9
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds plus mode, line scroll and more.
@@ -32,6 +32,7 @@ let doScroll;
 let lines;
 let currLine;
 let wordIndex;
+let prevNumTyped;
 
 let wordPos = -1;
 let currWord;
@@ -99,7 +100,9 @@ function hideTyped(wordPos) {
 function lineScroll() {
     if (currLine === lines.length-1) return;
     let numWords = lines[currLine].text.trim().split(/\s+/).length;
-    if (wordPos === 1 && (currWord = getCurrWord(currWord, wordPos)) === lines[currLine].text.split(' ')[wordIndex]) {
+    let numTyped = getNumTyped();
+    if (wordPos === 1 && (currWord = getCurrWord(currWord, wordPos)) === lines[currLine].text.split(' ')[wordIndex] && numTyped > prevNumTyped) {
+        prevNumTyped = numTyped;
         wordIndex++;
     }
     const nextFirstWord = lines[currLine+1].text.split(' ')[0];
@@ -157,7 +160,7 @@ function getCurrWord(currWord, wordPos) {
 }
 
 function getPos(currWord, wordPos) {
-    /*
+/*
     0 - start of quote
     1 - beginning of word
     2 - middle of word no typo
@@ -312,6 +315,7 @@ function raceStart() {
         lineShift = 0;
         currLine = 0;
         wordIndex = 1;
+        prevNumTyped = 0;
         textDiv.children[0].style.marginTop = '0px';
         textDiv.parentNode.style.marginTop = '0px';
         textDiv.parentNode.style.paddingTop = '0px';
