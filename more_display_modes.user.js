@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.7
+// @version      1.3.8
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds plus mode, line scroll and more.
@@ -9,6 +9,7 @@
 // @match        https://play.typeracer.com/*
 // @match        https://staging.typeracer.com/*
 // @icon         https://www.google.com/s2/favicons?domain=typeracer.com
+// @noframes
 // ==/UserScript==
 const settings = {
     plusEnable: false,
@@ -21,47 +22,44 @@ const settings = {
 let racing = false;
 let textDiv;
 let textSpans;
-let divHeight;
 let plusHeight;
 let lineScrollHeight;
 let switchedToMain = false;
 
 let lineShift;
 let lineHeight;
-let prevXPos;
-let prevYPos;
-let midWordScroll;
 let doScroll;
+let lines;
+let currLine;
+let wordIndex;
 
 let wordPos = -1;
 let currWord;
 let extraTypoChars = [];
 let firstWord = true;
-let typoFromStart = false;
-let newTypo = true;
 
 const newTheme = typeof com_typeracer_redesign_Redesign === "function";
 
 const monitorRace = new MutationObserver(doMode);
 
+function getNumTyped() {
+    if (wordPos === 0) return 0;
+    let numTyped = document.getElementsByClassName('txtInput')[0].value.length;
+    if (!firstWord) {
+        numTyped += textSpans[0].textContent.length;
+    }
+    return numTyped;
+}
+
 function getCurrSpanIndex() {
-    let i = 0;
-
-    if (wordPos <= 4) {
-        i = 0;
-    } else if (wordPos <= 7 || wordPos === 9) {
-        i = 1;
-    } else if (wordPos === 8) {
-        i = 2;
+    const numTyped = getNumTyped();
+    let numCovered = 0;
+    let index;
+    for (let i = 0; numCovered < numTyped; i++) {
+        numCovered += textSpans[i].textContent.length;
+        index = i;
     }
-
-    if (!firstWord && wordPos !== 1) {
-        i++;
-    }
-    if (wordPos === 3 && (currWord[currWord.length-1] === ',' || currWord[currWord.length-1] === ';')) {
-        i++;
-    }
-    return i;
+    return index + 1;
 }
 
 function plusMode() {
@@ -99,25 +97,26 @@ function hideTyped(wordPos) {
 }
 
 function lineScroll() {
-    if (document.activeElement !== document.getElementsByClassName('txtInput')[0]) return;
-    let currChar = textSpans[getCurrSpanIndex()+1];
-    if (!currChar) return;
-    let xPos = currChar.getBoundingClientRect().x;
-    let yPos = currChar.getBoundingClientRect().y;
-    let typo = document.getElementsByClassName('txtInput txtInput-error')[0];
-    if (xPos < prevXPos && yPos > prevYPos && !typo && !firstWord) {
-        if (!(midWordScroll && wordPos !== 1)) {
-            midWordScroll = false;
-            textDiv.style.transition = 'top 0.2s ease';
-            textDiv.style.top = `${lineShift}px`;
-            lineShift -= lineHeight;
-        }
-        if (wordPos !== 1) {
-            midWordScroll = true;
+    if (currLine === lines.length-1) return;
+    let numWords = lines[currLine].text.trim().split(/\s+/).length;
+    if (wordPos === 1 && (currWord = getCurrWord(currWord, wordPos)) === lines[currLine].text.split(' ')[wordIndex]) {
+        wordIndex++;
+    }
+    const nextFirstWord = lines[currLine+1].text.split(' ')[0];
+    let halfWord;
+    const typo = document.getElementsByClassName('txtInput txtInput-error')[0];
+    if (currWord.includes('-') && textSpans[getCurrSpanIndex()-1].textContent.endsWith('-') && !typo) {
+        halfWord = currWord.split('-')[1];
+        if (halfWord === nextFirstWord) {
+            wordIndex++;
         }
     }
-    prevXPos = xPos;
-    prevYPos = yPos;
+    if (wordIndex === numWords && (halfWord ? halfWord : currWord) === nextFirstWord) {
+        textDiv.style.top = `${lineShift}px`;
+        lineShift -= lineHeight;
+        currLine++;
+        wordIndex = 1;
+    }
 }
 
 function setCorrectColor() {
@@ -133,7 +132,6 @@ function setCorrectColor() {
 }
 
 function getCurrWord(currWord, wordPos) {
-    if (wordPos >= 7) return currWord;
     if (wordPos > 1) return currWord;
     currWord = '';
     if (!textSpans[0].textContent.includes(' ') || textSpans[0].textContent.length === 1) {
@@ -149,7 +147,6 @@ function getCurrWord(currWord, wordPos) {
     for (let i = 1; i < maxIndex; i++) {
         let currSpan = textSpans[i];
         if (currSpan.textContent.includes(' ')) break;
-        if (currSpan.className === 'typos') break;
         currWord += textSpans[i].textContent;
     }
     const remainingText = textSpans[textSpans.length-1].textContent;
@@ -170,44 +167,33 @@ function getPos(currWord, wordPos) {
     6 - typo at end of word
     7 - typo from start and beyond word length
     8 - typo from middle and beyond word length
-    9 - new typo beyond word length
+    9 - typo at end and beyond word length
+    10 - new typo beyond word length
 */
 
     let typo = document.getElementsByClassName('txtInput txtInput-error')[0];
-    let currWordAttempt = typo || document.getElementsByClassName('txtInput')[0];
-    currWordAttempt = currWordAttempt.value;
+    let currWordAttempt = document.getElementsByClassName('txtInput')[0].value;
     if (currWordAttempt === 'Type the above text here when the race begins') return 0;
 
     if (typo) {
-        if (newTypo) {
-            newTypo = false;
-            if (currWordAttempt.length > currWord.length) {
-                extraTypoChars = currWordAttempt.substr(currWord.length);
-                return 9;
-            }
-        }
-        if (typoFromStart) {
-            if (currWordAttempt.length > currWord.length) {
-                extraTypoChars = currWordAttempt.substr(currWord.length);
-                return 7;
-            }
-            return 4;
-        }
-        if (currWordAttempt.length === 1) {
-            typoFromStart = true;
-            return 4;
-        }
-        if (currWordAttempt.length < currWord.length) return 5;
-        if (currWordAttempt.length === currWord.length) return 6;
         if (currWordAttempt.length > currWord.length) {
             extraTypoChars = currWordAttempt.substr(currWord.length);
-            if (wordPos === 9) return 9;
-            return 8;
+            if (wordPos === 4 || wordPos === 7) return 7;
+            if (wordPos === 5 || wordPos === 8) return 8;
+            if (wordPos === 6 || wordPos === 9) return 9;
+            return 10;
         }
+        // Midway through word so sustain wordPos
+        if (wordPos === 4) return 4;
+        if (wordPos === 5) return 5;
+        if (wordPos === 6) return 6;
+
+        // New typo
+        if (currWordAttempt.length === 1) return 4;
+        if (currWordAttempt.length < currWord.length) return 5;
+        if (currWordAttempt.length === currWord.length) return 6;
     } else {
-        newTypo = true;
         if (currWordAttempt.length === 0) {
-            typoFromStart = false;
             if (!textSpans[0].textContent.includes(' ')) return 0;
             firstWord = false;
             return 1;
@@ -217,24 +203,77 @@ function getPos(currWord, wordPos) {
     }
 }
 
-function doMode() {
-    textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
-    textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
-    if (settings.lineScroll) {
-        if (textDiv.children.length >= 4) {
-            let boxOne = textDiv.children[1];
-            let boxTwo = textDiv.children[2];
-            lineHeight = boxTwo.getBoundingClientRect().top - boxOne.getBoundingClientRect().top;
-            lineScrollHeight = 3 * lineHeight;
-            doScroll = true;
-            textDiv.children[0].style.marginTop = '0px';
-            textDiv.parentNode.style.marginTop = '0px';
-            textDiv.parentNode.style.paddingTop = '0px';
-            textDiv.parentNode.style.overflowY = 'clip';
-        } else {
-            doScroll = false;
-        }
+// https://stackoverflow.com/questions/55604798/find-rendered-line-breaks-with-javascript
+function grabTextNodes(elem) {
+    const walker = document.createTreeWalker(elem, NodeFilter.SHOW_TEXT, null);
+    const nodes = [];
+    while (walker.nextNode()) {
+        nodes.push(walker.currentNode);
     }
+    return nodes;
+}
+
+function getLineBreaks(elem) {
+    const range = document.createRange();
+
+    lines = [];
+    const nodes = grabTextNodes(elem);
+    let left = 0;
+
+    let contTop = nodes[0].parentNode.getBoundingClientRect().top;
+
+    let prevLeft = null;
+    let lineText = "";
+    let startRange = null;
+    for (const node of nodes) {
+        let nodeText = node.textContent;
+        const textLength = nodeText.length;
+        let rangeIndex = 0;
+        let textIndex = 0;
+        while (rangeIndex <= textLength) {
+            range.setStart(node, rangeIndex);
+            if (rangeIndex < textLength -1) {
+                range.setEnd(node, rangeIndex + 1);
+            }
+            left = range.getBoundingClientRect().right;
+            if (prevLeft === null) {
+                prevLeft = left;
+                startRange = range.cloneRange();
+            } else if (left < prevLeft) { // line break
+                lineText += nodeText.slice(0, textIndex);
+                startRange.setEnd(range.endContainer, range.endOffset);
+                const { bottom } = startRange.getBoundingClientRect();
+                lines.push({
+                    y: bottom - contTop,
+                    text: lineText
+                });
+                prevLeft = left;
+                lineText = "";
+                nodeText = nodeText.slice(textIndex);
+                textIndex = 0;
+                startRange = range.cloneRange();
+            }
+            rangeIndex++;
+            textIndex++;
+            prevLeft = left;
+        }
+        lineText += nodeText;
+    }
+    startRange.setEnd(range.endContainer, range.endOffset);
+    const { bottom } = startRange.getBoundingClientRect();
+    lines.push({
+        y: bottom - contTop,
+        text: lineText
+    });
+    return lines;
+}
+
+function setHeight(n) {
+    lineHeight = lines[1].y - lines[0].y;
+    return n * lineHeight;
+}
+
+function doMode() {
     let height;
     if (doScroll) {
         height = lineScrollHeight;
@@ -264,11 +303,20 @@ function doMode() {
 function raceStart() {
     racing = true;
     textDiv = document.querySelector('.inputPanel tbody tr td table tbody tr td div');
-    textSpans = document.querySelectorAll('.inputPanel tbody tr td table tbody tr td div div span');
-    // Getting height to maintain
+    textSpans = textDiv.childNodes[0].childNodes;
+
     if (settings.lineScroll) {
+        lines = getLineBreaks(textDiv);
+        doScroll = lines.length >= 3 ? true : false;
+        lineScrollHeight = setHeight(3);
         lineShift = 0;
-        midWordScroll = false;
+        currLine = 0;
+        wordIndex = 1;
+        textDiv.children[0].style.marginTop = '0px';
+        textDiv.parentNode.style.marginTop = '0px';
+        textDiv.parentNode.style.paddingTop = '0px';
+        textDiv.parentNode.style.overflowY = 'clip';
+        textDiv.style.transition = 'top 0.2s ease';
     }
     if (settings.plusEnable) {
         plusHeight = textDiv.getBoundingClientRect().height;
@@ -284,8 +332,6 @@ function raceEnd() {
     plusHeight = -1;
     wordPos = -1;
     firstWord = true;
-    typoFromStart = false;
-    doScroll = false;
 }
 
 // Detecting game status
