@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.9
+// @version      1.3.10
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds plus mode, line scroll and more.
@@ -40,7 +40,6 @@ let extraTypoChars = [];
 let firstWord = true;
 
 const newTheme = typeof com_typeracer_redesign_Redesign === "function";
-
 const monitorRace = new MutationObserver(doMode);
 
 function getNumTyped() {
@@ -98,22 +97,35 @@ function hideTyped(wordPos) {
 }
 
 function lineScroll() {
+    if (!lines) {
+        getLineBreaks(textDiv);
+    }
     if (currLine === lines.length-1) return;
     let numWords = lines[currLine].text.trim().split(/\s+/).length;
     let numTyped = getNumTyped();
-    if (wordPos === 1 && (currWord = getCurrWord(currWord, wordPos)) === lines[currLine].text.split(' ')[wordIndex] && numTyped > prevNumTyped) {
+
+    currWord = getCurrWord(currWord, wordPos);
+    wordPos = getPos(currWord, wordPos);
+
+    // reached next word?
+    const nextWord = lines[currLine].text.split(' ')[wordIndex];
+    if (wordPos === 1 && currWord === nextWord && numTyped > prevNumTyped) {
         prevNumTyped = numTyped;
         wordIndex++;
     }
     const nextFirstWord = lines[currLine+1].text.split(' ')[0];
     let halfWord;
     const typo = document.getElementsByClassName('txtInput txtInput-error')[0];
+
+    // case when a hyphenated word crosses over a line
     if (currWord.includes('-') && textSpans[getCurrSpanIndex()-1].textContent.endsWith('-') && !typo) {
         halfWord = currWord.split('-')[1];
         if (halfWord === nextFirstWord) {
             wordIndex++;
         }
     }
+
+    // next line
     if (wordIndex === numWords && (halfWord ? halfWord : currWord) === nextFirstWord) {
         textDiv.style.top = `${lineShift}px`;
         lineShift -= lineHeight;
@@ -137,10 +149,17 @@ function setCorrectColor() {
 function getCurrWord(currWord, wordPos) {
     if (wordPos > 1) return currWord;
     currWord = '';
+    // First word
     if (!textSpans[0].textContent.includes(' ') || textSpans[0].textContent.length === 1) {
         currWord = textSpans[0].textContent;
     }
-
+    // Last word
+    if (!textSpans[textSpans.length-1].textContent.includes(' ')) {
+        for (let i = 1; i < textSpans.length; i++) {
+            currWord += textSpans[i].textContent;
+        }
+        return currWord;
+    }
     let maxIndex = textSpans.length-1;
     // Avoids including the 'plusN' span in forming currWord
     if (document.getElementsByClassName(`plus${settings.plusLength}`)[0]) {
@@ -218,59 +237,44 @@ function grabTextNodes(elem) {
 
 function getLineBreaks(elem) {
     const range = document.createRange();
-
     lines = [];
     const nodes = grabTextNodes(elem);
-    let left = 0;
-
-    let contTop = nodes[0].parentNode.getBoundingClientRect().top;
-
-    let prevLeft = null;
-    let lineText = "";
-    let startRange = null;
-    for (const node of nodes) {
-        let nodeText = node.textContent;
-        const textLength = nodeText.length;
-        let rangeIndex = 0;
-        let textIndex = 0;
-        while (rangeIndex <= textLength) {
-            range.setStart(node, rangeIndex);
-            if (rangeIndex < textLength -1) {
-                range.setEnd(node, rangeIndex + 1);
+    // first two nodes are always going to be on the same line, so no need to look at them
+    const node = nodes[nodes.length-1];
+    range.setStart(node, 0);
+    let contTop = node.parentNode.getBoundingClientRect().top;
+    // initial position
+    let prevTop = range.getBoundingClientRect().top;
+    let str = node.textContent;
+    let lastFound = 0;
+    let top = 0;
+    for (let curr = 1; curr < str.length; curr++) {
+        range.setStart(node, curr);
+        range.setEnd(node, curr+1);
+        top = range.getBoundingClientRect().top;
+        if (top > prevTop) {
+            let lineText = '';
+            if (lines.length === 0) { // first line so add previous node's text as they were skipped
+                for (let i = 0; i < nodes.length-1; i++) {
+                    lineText += nodes[i].textContent;
+                }
             }
-            left = range.getBoundingClientRect().right;
-            if (prevLeft === null) {
-                prevLeft = left;
-                startRange = range.cloneRange();
-            } else if (left < prevLeft) { // line break
-                lineText += nodeText.slice(0, textIndex);
-                startRange.setEnd(range.endContainer, range.endOffset);
-                const { bottom } = startRange.getBoundingClientRect();
-                lines.push({
-                    y: bottom - contTop,
-                    text: lineText
-                });
-                prevLeft = left;
-                lineText = "";
-                nodeText = nodeText.slice(textIndex);
-                textIndex = 0;
-                startRange = range.cloneRange();
-            }
-            rangeIndex++;
-            textIndex++;
-            prevLeft = left;
+            lineText += str.substr(lastFound, curr - lastFound);
+            lines.push({
+                y: prevTop - contTop,
+                text: lineText
+            });
+            prevTop = top;
+            lastFound = curr;
         }
-        lineText += nodeText;
     }
-    startRange.setEnd(range.endContainer, range.endOffset);
-    const { bottom } = startRange.getBoundingClientRect();
+    // push last line
     lines.push({
-        y: bottom - contTop,
-        text: lineText
+        y: top - contTop,
+        text: str.substr(lastFound)
     });
     return lines;
 }
-
 function setHeight(n) {
     lineHeight = lines[1].y - lines[0].y;
     return n * lineHeight;
@@ -314,7 +318,7 @@ function raceStart() {
         lineScrollHeight = setHeight(3);
         lineShift = 0;
         currLine = 0;
-        wordIndex = 1;
+        wordIndex = 1; // index of next word in line
         prevNumTyped = 0;
         textDiv.children[0].style.marginTop = '0px';
         textDiv.parentNode.style.marginTop = '0px';
