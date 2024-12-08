@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.10
+// @version      1.3.11
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds plus mode, line scroll and more.
@@ -35,12 +35,20 @@ let wordIndex;
 let prevNumTyped;
 
 let wordPos = -1;
+let prevWordPos;
+let skipFlag;
+let numWords;
 let currWord;
 let extraTypoChars = [];
 let firstWord = true;
 
 const newTheme = typeof com_typeracer_redesign_Redesign === "function";
 const monitorRace = new MutationObserver(doMode);
+
+function getNumTypedWords() {
+    if (!textSpans[0].textContent.includes(' ')) return 0;
+    return textSpans[0].textContent.trim().split(/\s+/).length;
+}
 
 function getNumTyped() {
     if (wordPos === 0) return 0;
@@ -104,14 +112,12 @@ function lineScroll() {
     let numWords = lines[currLine].text.trim().split(/\s+/).length;
     let numTyped = getNumTyped();
 
-    currWord = getCurrWord(currWord, wordPos);
-    wordPos = getPos(currWord, wordPos);
-
     // reached next word?
     const nextWord = lines[currLine].text.split(' ')[wordIndex];
-    if (wordPos === 1 && currWord === nextWord && numTyped > prevNumTyped) {
+    if ((wordPos === 1 || skipFlag) && currWord === nextWord && numTyped > prevNumTyped) {
         prevNumTyped = numTyped;
         wordIndex++;
+        currWord = getCurrWord(currWord, wordPos);
     }
     const nextFirstWord = lines[currLine+1].text.split(' ')[0];
     let halfWord;
@@ -147,7 +153,7 @@ function setCorrectColor() {
 }
 
 function getCurrWord(currWord, wordPos) {
-    if (wordPos > 1) return currWord;
+    if (wordPos > 1 && !skipFlag) return currWord;
     currWord = '';
     // First word
     if (!textSpans[0].textContent.includes(' ') || textSpans[0].textContent.length === 1) {
@@ -291,8 +297,16 @@ function doMode() {
     textDiv.style.position = 'relative';
     textDiv.style.visibility = "visible";
 
+    prevWordPos = wordPos;
     currWord = getCurrWord(currWord, wordPos);
     wordPos = getPos(currWord, wordPos);
+    let newNumWords = getNumTypedWords();
+    if (newNumWords > numWords && prevWordPos === 3 && wordPos !== 1) {
+        skipFlag = true;
+    } else {
+        skipFlag = false;
+    }
+    numWords = newNumWords;
     if (settings.plusEnable) {
         plusMode();
     }
