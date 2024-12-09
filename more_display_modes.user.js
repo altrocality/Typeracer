@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.3.11
+// @version      1.3.12
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds plus mode, line scroll and more.
@@ -31,8 +31,8 @@ let lineHeight;
 let doScroll;
 let lines;
 let currLine;
-let wordIndex;
-let prevNumTyped;
+let oldTop;
+let firstWordLength;
 
 let wordPos = -1;
 let prevWordPos;
@@ -109,34 +109,26 @@ function lineScroll() {
         getLineBreaks(textDiv);
     }
     if (currLine === lines.length-1) return;
-    let numWords = lines[currLine].text.trim().split(/\s+/).length;
-    let numTyped = getNumTyped();
+    const numTyped = getNumTyped();
+    if (numTyped < firstWordLength) return;
 
-    // reached next word?
-    const nextWord = lines[currLine].text.split(' ')[wordIndex];
-    if ((wordPos === 1 || skipFlag) && currWord === nextWord && numTyped > prevNumTyped) {
-        prevNumTyped = numTyped;
-        wordIndex++;
-        currWord = getCurrWord(currWord, wordPos);
-    }
-    const nextFirstWord = lines[currLine+1].text.split(' ')[0];
-    let halfWord;
+    const nodes = grabTextNodes(textDiv);
+    const currNode = nodes[getCurrSpanIndex()];
+    const endNode = nodes[nodes.length-1];
+    const range = document.createRange();
+
+    range.setStart(currNode, 0);
+    range.setEnd(endNode, 0);
+    const currTop = range.getBoundingClientRect().top;
     const typo = document.getElementsByClassName('txtInput txtInput-error')[0];
 
-    // case when a hyphenated word crosses over a line
-    if (currWord.includes('-') && textSpans[getCurrSpanIndex()-1].textContent.endsWith('-') && !typo) {
-        halfWord = currWord.split('-')[1];
-        if (halfWord === nextFirstWord) {
-            wordIndex++;
-        }
-    }
-
-    // next line
-    if (wordIndex === numWords && (halfWord ? halfWord : currWord) === nextFirstWord) {
+    if (Math.floor(currTop - oldTop) === Math.floor(lineHeight) && !typo && wordPos !== 3) {
         textDiv.style.top = `${lineShift}px`;
         lineShift -= lineHeight;
         currLine++;
-        wordIndex = 1;
+    }
+    if (!typo && wordPos !== 3) {
+        oldTop = currTop;
     }
 }
 
@@ -245,7 +237,7 @@ function getLineBreaks(elem) {
     const range = document.createRange();
     lines = [];
     const nodes = grabTextNodes(elem);
-    // first two nodes are always going to be on the same line, so no need to look at them
+    // The last node contains the text, previous nodes contain first word
     const node = nodes[nodes.length-1];
     range.setStart(node, 0);
     let contTop = node.parentNode.getBoundingClientRect().top;
@@ -260,7 +252,7 @@ function getLineBreaks(elem) {
         top = range.getBoundingClientRect().top;
         if (top > prevTop) {
             let lineText = '';
-            if (lines.length === 0) { // first line so add previous node's text as they were skipped
+            if (lines.length === 0) { // first line so add first word
                 for (let i = 0; i < nodes.length-1; i++) {
                     lineText += nodes[i].textContent;
                 }
@@ -328,12 +320,15 @@ function raceStart() {
 
     if (settings.lineScroll) {
         lines = getLineBreaks(textDiv);
+        const nodes = grabTextNodes(textDiv);
+        firstWordLength = 0;
+        for (let i = 0; i < nodes.length-1; i++) {
+            firstWordLength += nodes[i].length;
+        }
         doScroll = lines.length >= 3 ? true : false;
         lineScrollHeight = setHeight(3);
         lineShift = 0;
         currLine = 0;
-        wordIndex = 1; // index of next word in line
-        prevNumTyped = 0;
         textDiv.children[0].style.marginTop = '0px';
         textDiv.parentNode.style.marginTop = '0px';
         textDiv.parentNode.style.paddingTop = '0px';
