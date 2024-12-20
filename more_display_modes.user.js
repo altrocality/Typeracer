@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.4.0
+// @version      1.4.1
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds tape mode, line scroll, and more.
@@ -834,6 +834,8 @@ function raceStart() {
             tapeInitShift = 0.4*textDivWidth + textSpans[0].getBoundingClientRect().width;
         }
         caretPosition = textDiv.getBoundingClientRect().left + tapeInitShift;
+        document.body.style.overflowY = 'hidden';
+        document.body.style.overflowX = 'hidden';
         textDiv.style.left = `${tapeInitShift}px`;
         textDiv.style.whiteSpace = 'nowrap';
         textDiv.parentNode.style.overflowY = 'hidden';
