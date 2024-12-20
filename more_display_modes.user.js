@@ -834,8 +834,8 @@ function raceStart() {
             tapeInitShift = 0.4*textDivWidth + textSpans[0].getBoundingClientRect().width;
         }
         caretPosition = textDiv.getBoundingClientRect().left + tapeInitShift;
-        document.body.style.overflowY = 'hidden';
-        document.body.style.overflowX = 'hidden';
+        document.body.style.overflowY = 'auto';
+        document.body.style.overflowX = 'auto';
         textDiv.style.left = `${tapeInitShift}px`;
         textDiv.style.whiteSpace = 'nowrap';
         textDiv.parentNode.style.overflowY = 'hidden';
