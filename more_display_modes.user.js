@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.4.1
+// @version      1.4.2
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds tape mode, line scroll, and more.
@@ -870,6 +870,7 @@ function raceEnd() {
     wordPos = 0;
     firstWord = true;
     prevTime = null;
+    doScroll = null;
     const caretToRemove = document.getElementById('defaultCaret') || document.getElementById('stillCaret');
     removeCaret(caretToRemove);
     clearInterval(interval);
