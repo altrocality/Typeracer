@@ -221,7 +221,7 @@ let start;
 let dest;
 let prevDest;
 let prevTime;
-const duration = 90;
+const duration = 110;
 
 let caret;
 let caretPosition;
