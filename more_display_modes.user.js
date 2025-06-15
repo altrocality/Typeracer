@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.4.2
+// @version      1.4.3
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds tape mode, line scroll, and more.
@@ -221,7 +221,7 @@ let start;
 let dest;
 let prevDest;
 let prevTime;
-const duration = 110;
+const duration = 90;
 
 let caret;
 let caretPosition;
@@ -523,7 +523,7 @@ function tapeMode() {
     dest = getTapeShift();
     start = parseInt(window.getComputedStyle(textDiv).left);
 
-    if (Math.floor(start) !== Math.floor(dest)) {
+        if (start !== dest) {
         animationId = requestAnimationFrame(applyTapeShift);
     }
     prevDest = dest;
@@ -575,14 +575,23 @@ function lineScroll() {
     range.setStart(currNode, 0);
     range.setEnd(endNode, 0);
     const currTop = range.getBoundingClientRect().top;
-    const typo = document.getElementsByClassName('txtInput txtInput-error')[0];
 
-    if (Math.floor(currTop - oldTop) === Math.floor(lineHeight) && !typo && wordPos !== 3) {
+    const yDiff = Math.abs(currTop - oldTop - lineHeight)
+    let compareWord;
+
+    const lineText = lines[currLine].text.split(" ");
+    const lastWord = lineText[lineText.length-2];
+    if (lastWord.endsWith("-") && currWord.includes("-")) {
+        compareWord = currWord.substr(lastWord.length)
+    } else {
+        compareWord = currWord;
+    }
+    if (yDiff <= 1 && compareWord == lines[currLine+1].text.split(" ")[0] && wordPos < 3) {
         textDiv.style.top = `${lineShift}px`;
         lineShift -= lineHeight;
         currLine++;
     }
-    if (!typo && wordPos !== 3) {
+    if (wordPos < 3) {
         oldTop = currTop;
     }
 }
@@ -617,6 +626,7 @@ function setTypoColor() {
 
 function setExtraTypoColor() {
     if (tapeEnable) return;
+    if (getNumTyped() >= getQuoteLength()) return;
     if (wordPos >= 7) {
         handleExtraTypos();
     }
@@ -672,7 +682,7 @@ function getPos() {
     10 - new typo beyond word length
 */
     let currWordAttempt = document.getElementsByClassName('txtInput')[0];
-    if (!currWordAttempt) return wordPos;
+    if (!currWordAttempt) return 0;
     currWordAttempt = currWordAttempt.value;
     if (currWordAttempt === 'Type the above text here when the race begins') return 0;
     if (currWordAttempt.length === 0) {
@@ -753,7 +763,7 @@ function getLineBreaks(elem) {
     return lines;
 }
 
-function setHeight(n) {
+function setHeight(n, lines) {
     lineHeight = lines[1].y - lines[0].y;
     return n * lineHeight;
 }
@@ -787,6 +797,7 @@ function doMode() {
                 createSCaret();
             }
         }
+        document.getElementsByClassName('txtInput')[0].setAttribute("maxLength", currWord.length + 5);
         tapeMode();
     }
     if (plusEnable) {
@@ -825,7 +836,7 @@ function raceStart() {
         backgroundColor: textStyle.backgroundColor
     };
     if (tapeEnable) {
-        tapeHeight = lines.length === 1 ? -1 : setHeight(1);
+        tapeHeight = lines.length === 1 ? -1 : setHeight(1, lines);
         const textDivWidth = textDiv.getBoundingClientRect().width;
         textDiv.style.width = `${textDivWidth}px`;
         if (newTheme) {
@@ -844,7 +855,7 @@ function raceStart() {
     }
     if (scrollEnable) {
         doScroll = lines.length >= 3 ? true : false;
-        lineScrollHeight = doScroll ? setHeight(3) : -1;
+        lineScrollHeight = doScroll ? setHeight(3, lines) : -1;
         lineShift = 0;
         currLine = 0;
         textDiv.children[0].style.marginTop = '0px';
