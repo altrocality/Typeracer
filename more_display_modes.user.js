@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.4.3
+// @version      1.4.4
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds tape mode, line scroll, and more.
@@ -587,6 +587,7 @@ function lineScroll() {
         compareWord = currWord;
     }
     if (yDiff <= 1 && compareWord == lines[currLine+1].text.split(" ")[0] && wordPos < 3) {
+        lineHeight = currTop - oldTop;
         textDiv.style.top = `${lineShift}px`;
         lineShift -= lineHeight;
         currLine++;
