@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Typeracer: More Display Modes
 // @namespace    http://tampermonkey.net/
-// @version      1.4.4
+// @version      1.4.5
 // @downloadURL  https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @updateURL    https://raw.githubusercontent.com/altrocality/Typeracer/master/more_display_modes.user.js
 // @description  Adds tape mode, line scroll, and more.
@@ -580,15 +580,22 @@ function lineScroll() {
     let compareWord;
 
     const lineText = lines[currLine].text.split(" ");
-    const lastWord = lineText[lineText.length-2];
+    const lastWord = lineText[lineText.length-1];
     if (lastWord.endsWith("-") && currWord.includes("-")) {
-        compareWord = currWord.substr(lastWord.length)
+        let hyphenIndex = lastWord.indexOf("-");
+        let currWordAttempt = document.getElementsByClassName('txtInput')[0];
+        currWordAttempt = currWordAttempt.value;
+        if (currWordAttempt.length > hyphenIndex) {
+            compareWord = currWord.substr(hyphenIndex+1);
+        } else {
+            compareWord = currWord.substr(0, hyphenIndex+1);
+        }
     } else {
         compareWord = currWord;
     }
     if (yDiff <= 1 && compareWord == lines[currLine+1].text.split(" ")[0] && wordPos < 3) {
-        lineHeight = currTop - oldTop;
         textDiv.style.top = `${lineShift}px`;
+        lineHeight = currTop - oldTop;
         lineShift -= lineHeight;
         currLine++;
     }
